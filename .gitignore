@@ -1,0 +1,6 @@
+env/
+.idea/
+__pycache__/
+Tests/
+*walkthrough*
+*2.0*
