@@ -1,6 +1,4 @@
-env/
-.idea/
-__pycache__/
-Tests/
-*walkthrough*
-*2.0*
+venv/
+*.egg*
+*cache*
+.*

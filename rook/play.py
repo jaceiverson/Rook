@@ -1,107 +1,34 @@
+# standard library stuff
 import random
 import json
 import socket
-import pandas as pd
 import datetime as dt
-from tkinter import *
+
+# pypy stuff
+import pandas as pd
+
+# pygame stuff
 from pygame import mixer
+from tkinter import Tk, LabelFrame, Button, W, E
 from PIL import Image, ImageTk
-import teamMaker
-# import some classes too
-from Rook.player import Player
-from Rook.card import Card
-from Rook.trick import Trick
+
+# import some local classes too
+from game_play import Player, Trick, Card, get_players, make_deck_list, shuffle_deck
 
 
-def randomize_teams():
-    players = teamMaker.main(4, 2)
-    play_order = [players[0], players[2], players[1], players[3]]
-    return play_order
-
-
-def validate_input():
-    pass
-
-
-def get_players():
-    good_input = False
-    while good_input is False:
-        gen_teams = input('Generate random teams? (y/n)')
-        if gen_teams.lower() in ('y', 'n'):
-            good_input = True
-        else:
-            print('Valid input please')
-    players = {}
-
-    if gen_teams.lower() == 'y':
-        players_order = randomize_teams()
-        players[players_order[0]] = {'Team': 1}
-        players[players_order[2]] = {'Team': 1}
-        players[players_order[1]] = {'Team': 2}
-        players[players_order[3]] = {'Team': 2}
-    else:
-
-        for x in range(4):
-            if x == 0:
-                print('Team 1')
-            elif x == 2:
-                print('Team 2')
-            temp = input('Player ' + str(x + 1) + ' name: ')
-            team = 1
-            if x >= 2:
-                team = 2
-            players[temp] = {'Team': team}
-
-    return players
-
-
-def distribute_cards(cards, players):
+def distribute_cards(cards: list[Card], players: list[Player]):
+    # after cards are suffled give them to the players
     player_names = list(players.keys())
     players_order = [player_names[0], player_names[2], player_names[1], player_names[3]]
-    player_dict = {}
-    # make list of players
-    for x in range(len(players_order)):
-        player_dict[players_order[x]] = Player(players_order[x], x + 1, cards[x], players[players_order[x]]['Team'])
-
-    return player_dict
-
-
-def make_card(suit: str, number: int, pvalue: int, tvalue: int = None):
-    """
-    This function accepts the suit and value of the card and returns
-    the constructed Card object with the suit and value
-    assigned to the values passed on to the function.
-    """
-    card_obj = Card(suit, number, pvalue, tvalue)
-    return card_obj
-
-
-def make_card_deck_list():
-    """
-    This function takes in a dictionary of card suit and value pairs,
-    creates a list of Card objects and returns it
-    """
-    card_list = list()
-    with open('./Rook/deck.json', 'r') as f:
-        rook_deck = json.load(f)
-
-    rook_deck = rook_deck['ROOK DECK']
-
-    for suit, number in rook_deck.items():
-        for card in rook_deck[suit]:
-            card_obj = make_card(suit, card['Number'], card['pValue'], card['tValue'])
-            card_list.append(card_obj)
-
-    return card_list
-
-
-def generate_shuffled_deck(full_deck: [Card]) -> [Card]:
-    """
-    This function takes in as input the list of Card objects, shuffles them
-    and returns the shuffled list.
-    """
-    random.shuffle(full_deck)
-    return full_deck
+    return {
+        players_order[x]: Player(
+            players_order[x],
+            x + 1,
+            cards[x],
+            players[players_order[x]]["Team"],
+        )
+        for x in range(len(players_order))
+    }
 
 
 def deal(shuffled_deck):
@@ -130,22 +57,20 @@ def deal(shuffled_deck):
 def validate_bid(player, min_bid, pass_count):
     # check to make sure the input is valid
     good_input = False
-    while good_input is False:
-        bid = input('BID: ')
+    while not good_input:
+        bid = input("BID: ")
         try:
             int_bid = int(bid)
             if int_bid >= min_bid and int_bid <= 180:
                 good_input = True
             else:
-                print('Enter a valid number', str(min_bid), ' - ', '180')
+                print("Enter a valid number", min_bid, " - ", "180")
         except ValueError as e:
-            if bid.lower() == 'pass':
+            if bid.lower() == "pass":
                 int_bid = 0
                 good_input = True
             else:
-                print('Enter a valid number', str(min_bid), ' - ', '180')
-                pass
-
+                print("Enter a valid number", min_bid, " - ", "180")
     player.set_bid(int_bid)
 
     if player.bid == 0:
@@ -158,20 +83,20 @@ def validate_bid(player, min_bid, pass_count):
 
 
 def show_widow(widow, player):
-    print('Widow. Taken at ' + str(player.bid) + ' by ' + player.name)
+    print(f"Widow. Taken at {str(player.bid)} by " + player.name)
     for x in widow:
         print(x.suit, x.number)
 
 
 def bid_sequence(players):
-    min_bid = 100
     winner = False
-    max_bidder = ''
+    max_bidder = ""
     max_bid = 0
     pass_count = 0
     current_bid = 0
-    bid_leader = ''
-    while winner is False:
+    bid_leader = ""
+    min_bid = 100
+    while not winner:
         for x in players:
             if x.bid > 0:
                 if pass_count > 2:
@@ -179,25 +104,26 @@ def bid_sequence(players):
                     max_bidder.hand = x.hand
                     winner = True
                     break
-                print(x.name + '\'s bid')
-                print('Type your bid. You must bid at least: ' + ' ' + str(min_bid))
+                print(x.name + "'s bid")
+                print("Type your bid. You must bid at least: " + " " + str(min_bid))
                 current_bid, min_bid, pass_count = validate_bid(x, min_bid, pass_count)
                 if current_bid > 0:
-                    print('Current bid  is @ ' + str(current_bid))
+                    print(f"Current bid  is @ {str(current_bid)}")
 
-    print(max_bidder.name + ' has won the bid at ' + str(max_bidder.bid) + '.')
+    print(max_bidder.name + " has won the bid at " + str(max_bidder.bid) + ".")
 
     good_input = False
-    while good_input is False:
+    while not good_input:
         try:
             up_bid = input(
-                'If you would like to increase your bid, please put a value greater than ' + str(max_bidder.bid))
+                f"If you would like to increase your bid, please put a value greater than {str(max_bidder.bid)}"
+            )
             if int(up_bid) % 5 != 0:
-                print('Bid must be a multiple of 5. Try again.')
+                print("Bid must be a multiple of 5. Try again.")
             else:
                 good_input = True
         except ValueError as e:
-            if up_bid.lower() == 'no' or up_bid.lower() == 'pass':
+            if up_bid.lower() in ["no", "pass"]:
                 up_bid = max_bidder.bid
                 good_input = True
             up_bid = 0
@@ -209,64 +135,63 @@ def bid_sequence(players):
 
 
 def pregame_details(player):
-    '''
+    """
     :param player: player who won the widow and now needs to drop cards
     :return: which cards were dropped as well as what suit is trump
-    '''
-    print('Which cards would you like to drop?')
+    """
+    print("Which cards would you like to drop?")
     dropped_cards_list = []
     while len(dropped_cards_list) < 5:
         player.show_hand()
         good_input = False
-        while good_input is False:
+        while not good_input:
             try:
-                drop = int(input('Index number to drop: '))
+                drop = int(input("Index number to drop: "))
                 good_input = True
-            except:
-                print('Please put in a valid input')
+            except ValueError as e:
+                print("Please put in a valid input")
         dropped_card = player.drop_card(drop)
         dropped_cards_list.append(dropped_card)
 
-    print('Final Hand:')
+    print("Final Hand:")
     player.show_hand()
-    suits = ['Black', 'Green', 'Yellow', 'Red']
-    print('Which suit is going to be trump?')
+    suits = ["Black", "Green", "Yellow", "Red"]
+    print("Which suit is going to be trump?")
     print(suits)
 
     good_input = False
-    while good_input is False:
-        trump_input = input('')
+    while not good_input:
+        trump_input = input("")
 
         if trump_input.title() in suits:
             trump = trump_input.title()
             good_input = True
         else:
-            print('Please use a valid input')
+            print("Please use a valid input")
 
     return dropped_cards_list, trump
 
 
 def assign_trump_to_cards(trump_suit, players):
-    '''
+    """
     :param trump_suit: suit previously declared as trump
     :param players: list of players
     :return: nothing, assigns all the cards in player's hands to trump
-    '''
+    """
     for x in players:
         for y in x.hand:
             # also assign each card to its owner
             y.owner = x
-            if y.suit == trump_suit or y.suit == 'Rook':
+            if y.suit in [trump_suit, "Rook"]:
                 y.trump = True
 
 
 def create_trick(num):
-    '''
+    """
     :param num: number of the trick (number is order sequencial of trick
     :return: trick object
-    '''
-    trick_obj = Trick(num)
-    return trick_obj
+    """
+    return Trick(num)
 
 
 def play_tricks(players, starting_player, play_order):
@@ -280,12 +205,10 @@ def play_tricks(players, starting_player, play_order):
         current_trick = create_trick(x + 1)
         tricks.append(current_trick)
         # change the trick order
-        section_a = play_order[play_order.index(trick_winner.name):]
-        section_b = play_order[:play_order.index(trick_winner.name)]
+        section_a = play_order[play_order.index(trick_winner.name) :]
+        section_b = play_order[: play_order.index(trick_winner.name)]
         play_order = section_a + section_b
-        trick_player_order = 1
-
-        for y in play_order:
+        for trick_player_order, y in enumerate(play_order, start=1):
             current_player = players[y]
             player_card = play_hand(current_player, current_trick, trick_player_order)
             # assign the card to the order in the trick
@@ -298,9 +221,13 @@ def play_tricks(players, starting_player, play_order):
             elif trick_player_order == 4:
                 current_trick.forth_card = player_card
 
-            print(current_player.name + ' plays ' + player_card.suit + ' ' + str(player_card.number))
-
-            trick_player_order += 1
+            print(
+                current_player.name
+                + " plays "
+                + player_card.suit
+                + " "
+                + str(player_card.number)
+            )
 
         trick_winner = current_trick.winning_pair()
         current_trick.find_points()
@@ -310,7 +237,7 @@ def play_tricks(players, starting_player, play_order):
 
 
 def play_hand(player, trick, count):
-    '''
+    """
     :param player:
     :param trick:
     :param count:
@@ -320,7 +247,7 @@ def play_hand(player, trick, count):
     1) SEND show_hand (tkinter/socket)
     2) RECEIVE card_to_play (from network device)
     3) BROADCAST the card that was played
-    '''
+    """
     try:
         lead_suit = trick.first_card.suit
         lead_is_trump = trick.first_card.trump
@@ -334,17 +261,16 @@ def play_hand(player, trick, count):
     available_cards = player.available_cards(lead_suit, count, lead_is_trump)
 
     good_input = False
-    while good_input is False:
+    while not good_input:
         try:
-            card = int(input('Index of card to play: '))
+            card = int(input("Index of card to play: "))
             if card <= len(available_cards):
                 good_input = True
             else:
-                print('Not an availible card')
+                print("Not an availible card")
                 available_cards = player.availible_cards(lead_suit, count)
-                pass
-        except:
-            print('Please put in a valid input')
+        except ValueError as e:
+            print("Please put in a valid input")
     card_to_play = available_cards[card - 1]
 
     # removes the card from the players hand
@@ -359,7 +285,7 @@ def find_winner(all_tricks, widow, bid_winner):
     team_2 = 0
     final_trick_winning_team = all_tricks[12].winning_player.team
     bidding_team = bid_winner.team
-    game_resolution = ''
+    game_resolution = ""
 
     for x in all_tricks:
         if x.winning_player.team == 1:
@@ -371,7 +297,7 @@ def find_winner(all_tricks, widow, bid_winner):
     for x in widow:
         print(x.suit, x.number)
         widow_points += x.pvalue
-    print('Widow Point value: ', widow_points)
+    print("Widow Point value: ", widow_points)
 
     if final_trick_winning_team == 1:
         team_1 += widow_points
@@ -381,43 +307,39 @@ def find_winner(all_tricks, widow, bid_winner):
     if bidding_team == 1:
         if bid_winner.bid > team_1:
             team_1 = bid_winner.bid * -1
-            game_resolution = 'Team 1 didn\'t reach their bid'
+            game_resolution = "Team 1 didn't reach their bid"
         else:
             team_1 = bid_winner.bid
-            game_resolution = 'Team 1 reached their bid'
+            game_resolution = "Team 1 reached their bid"
+    elif bid_winner.bid > team_2:
+        team_2 = bid_winner.bid * -1
+        game_resolution = "Team 2 didn't reach their bid"
     else:
-        if bid_winner.bid > team_2:
-            team_2 = bid_winner.bid * -1
-            game_resolution = 'Team 2 didn\'t reach their bid'
-        else:
-            team_2 = bid_winner.bid
-            game_resolution = 'Team 2 reached their bid'
+        team_2 = bid_winner.bid
+        game_resolution = "Team 2 reached their bid"
 
     # final check for a grandslam
     if team_1 == 180:
         team_1 = 180
-        game_resolution = 'Team 1 Grand Slam'
+        game_resolution = "Team 1 Grand Slam"
     elif team_2 == 180:
         team_2 = 180
-        game_resolution = 'Team 2 Grand Slam'
+        game_resolution = "Team 2 Grand Slam"
 
-    game_summary = print_results(team_1, team_2, game_resolution)
-
-    return game_summary
+    return print_results(team_1, team_2, game_resolution)
 
 
 def print_results(one, two, resolution):
     print(resolution)
-    print('Team 1 Score: ' + str(one))
-    print('Team 2 Score: ' + str(two))
-    game_dict = {'Team 1 Score': one, 'Team 2 Score': two, 'Outcome': resolution}
-    return game_dict
+    print(f"Team 1 Score: {str(one)}")
+    print(f"Team 2 Score: {str(two)}")
+    return {"Team 1 Score": one, "Team 2 Score": two, "Outcome": resolution}
 
 
-def play_one_hand_of_rook(playerList):
+def play_one_hand_of_rook(playerList: str):
     # make the cards and shuffle them
-    cards = make_card_deck_list()
-    shuffled_deck = generate_shuffled_deck(cards)
+    cards = make_deck_list()
+    shuffled_deck = shuffle_deck(cards)
 
     # deal cards: returns list of lists. Order -> 1,2,3,4, widow
     dealt_cards = deal(shuffled_deck)
@@ -448,25 +370,25 @@ def play_rook():
     team1 = 0
     team2 = 0
     players = get_players()
-    date = dt.datetime.today().strftime('%Y-%m-%d %r')
+    date = dt.datetime.now().strftime("%Y-%m-%d %r")
     while team1 < 500 and team2 < 500:
         game_count = 1
-        master_game_scorecard = {}
         tricks, game_results = play_one_hand_of_rook(players)
-        master_game_scorecard['Game ' + str(game_count)] = game_results
-        team1 += game_results['Team 1 Score']
-        team2 += game_results['Team 2 Score']
+        master_game_scorecard = {f"Game {game_count}": game_results}
+        team1 += game_results["Team 1 Score"]
+        team2 += game_results["Team 2 Score"]
 
         df = pd.DataFrame([vars(f) for f in tricks])
 
-        df.to_excel('/Users/Documents/Tech_Stuff/Python/Rook/game_data/game_' + date + '.xlsx',
-                    sheet_name=('Game ' + str(game_count)))
+        df.to_csv(
+            "/game_data/game_" + date + ".xlsx",
+        )
 
         game_count += 1
 
 
 # TODO
-'''
+"""
 
 Work on making Tkinter GUI for the game
 send the info out to the local network
@@ -476,13 +398,13 @@ show hand will display the cards, but not allow you to click to send them anywhe
 I have taken a break from this, but want to get it to work
 
 Sockets was working, I can send data over the local network, but I am having a hard time sending it back and forth
-'''
+"""
 
 
 def show_hand(hand):
     mixer.init()
     root = Tk()
-    root.title('Hand')
+    root.title("Hand")
     root.resizable(False, False)
 
     # Frame for the buttons.
@@ -508,23 +430,24 @@ def show_hand(hand):
     cards = []
     images = []
 
-    for x in range(len(hand)):
+    for card, idx in enumerate(hand):
         cards.append(Button(cards_frame, command=show_back))
         images.append(
-            Image.open('/Users/jaceiverson/Documents/Tech_Stuff/Python/Rook/card-img/' + hand[x].s_name + '.jpg'))
-        PHOTO = ImageTk.PhotoImage(images[x].resize((75, 120), Image.BOX))
+            Image.open("./rook/resources/card-img/" + card.short_name() + ".jpg")
+        )
+        PHOTO = ImageTk.PhotoImage(images[idx].resize((75, 120), Image.BOX))
 
-        cards[x].config(image=PHOTO)
+        cards[idx].config(image=PHOTO)
 
-        cards[x].grid(row=1, column=x + 1, padx=2, pady=2)
+        cards[idx].grid(row=1, column=idx + 1, padx=2, pady=2)
 
-        cards[x].photo = PHOTO
+        cards[idx].photo = PHOTO
 
     root.mainloop()
 
 
 def show_back():
-    back = Image.open('/Users/jaceiverson/Documents/Tech_Stuff/Python/Rook/card-img/back.jpg')
+    back = Image.open("./rook/resources/card-img/back.jpg")
     PHOTO = ImageTk.PhotoImage(back.resize((75, 120), Image.BOX))
     back.config(image=PHOTO)
     back.grid(row=1, column=1, padx=2, pady=2)
@@ -532,7 +455,7 @@ def show_back():
 
 
 def set_up_socket(hand, x):
-    '''
+    """
     socket test?
 
     for x in range(len(dealt_cards)):
@@ -543,7 +466,7 @@ def set_up_socket(hand, x):
         else:
             #this is the widow and doesn't need to be sent out yet.
             pass
-    '''
+    """
 
     s = socket.socket()
     host = socket.gethostbyname(socket.gethostname())
@@ -552,7 +475,7 @@ def set_up_socket(hand, x):
     s.bind((host, port))
     s.listen(5)
     c, addr = s.accept()
-    print("Connection accepted from " + repr(addr[1]))
+    print(f"Connection accepted from {repr(addr[1])}")
     c.send(hand)
     c.close()
 
@@ -562,7 +485,7 @@ def set_up_socket(hand, x):
 # idk?
 def show_hand_test():
     # make the cards and shuffle them
-    cards = make_card_deck_list()
+    cards = make_deck_list()
     shuffled_deck = generate_shuffled_deck(cards)
 
     # deal cards: returns list of lists. Order -> 1,2,3,4, widow
@@ -573,5 +496,5 @@ def show_hand_test():
         show_hand(x)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     play_rook()
