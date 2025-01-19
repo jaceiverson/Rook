@@ -1,34 +1,65 @@
+import pygame
 import socket
-import pickle
+import threading
 
-def create(HOST,PORT):
-    # Create a socket connection.
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((HOST, PORT))
-    return s
+# Define server host and port
+HOST = "localhost"
+PORT = 9999
 
-def send(data,s):
+# Initialize pygame
+pygame.init()
+width, height = 400, 300
+screen = pygame.display.set_mode((width, height))
+pygame.display.set_caption("Card Game")
 
-    # Pickle the object and send it to the server
-    data_string = pickle.dumps(data)
-    s.send(data_string)
+# Create YES and NO buttons
+button_yes = pygame.Rect(50, 50, 100, 50)
+button_no = pygame.Rect(250, 50, 100, 50)
 
-def send_name():
-    pass
-if __name__=='__main__':
 
-    h='10.0.0.169'
-    p=5002
-    sock=create(h,p)
+def handle_connection():
+    # Connect to the server
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((HOST, PORT))
+    print("Connected to server")
 
-    Card={'jace':['1',2,3,4,5,6]}
-    
-    other={'nat':[1,2,3,4,5,'6']}
-    send(Card,sock)
-    #send(other,sock)
-
-    '''
     while True:
-        if sock.recv(4096)
-    '''
-    #sock.close()
+        # Receive data from the server
+        data = client_socket.recv(1024).decode()
+        if not data:
+            break  # No more data, break out of the loop
+
+        print("Received data:", data)
+
+    # Close the connection
+    client_socket.close()
+
+
+# Create multiple client connections
+num_clients = 3  # Specify the number of client connections you want
+threads = []
+for _ in range(num_clients):
+    thread = threading.Thread(target=handle_connection)
+    thread.start()
+    threads.append(thread)
+
+# Game loop
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    # Fill the background
+    screen.fill((255, 255, 255))
+
+    # Draw buttons
+    pygame.draw.rect(screen, (0, 255, 0), button_yes)
+    pygame.draw.rect(screen, (255, 0, 0), button_no)
+
+    # Update the display
+    pygame.display.flip()
+
+# Wait for all threads to complete
+for thread in threads:
+    thread.join()

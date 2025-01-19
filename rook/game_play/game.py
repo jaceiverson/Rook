@@ -1,8 +1,8 @@
-from game_play.game_objects import Round, Team, Player
+import datetime as dt
+
 import game_play.preprocessing as pp
 import game_play.team_maker as tm
-import datetime as dt
-from typing import Optional
+from game_play.game_objects import Player, Round, Team
 
 
 class Game:

@@ -1,19 +1,19 @@
 # standard library stuff
-import random
-import json
-import socket
 import datetime as dt
+import json
+import random
+import socket
+from tkinter import Button, E, LabelFrame, Tk, W
 
 # pypy stuff
 import pandas as pd
 
-# pygame stuff
-from pygame import mixer
-from tkinter import Tk, LabelFrame, Button, W, E
+# import some local classes too
+from game_play import Card, Player, Trick, get_players, make_deck_list, shuffle_deck
 from PIL import Image, ImageTk
 
-# import some local classes too
-from game_play import Player, Trick, Card, get_players, make_deck_list, shuffle_deck
+# pygame stuff
+from pygame import mixer
 
 
 def distribute_cards(cards: list[Card], players: list[Player]):
@@ -44,8 +44,8 @@ def deal(shuffled_deck):
         # checks to make sure you have at least one pointer in your hand
         if sum(y.pvalue for y in x) == 0:
             # to be honest, I think this works, but I am not sure. Hopefully we don't ever run into it.
-            new_shuffle = random.shuffle(shuffled_deck)
-            return deal(new_shuffle)
+            random.shuffle(shuffled_deck)
+            return deal(shuffled_deck)
 
     # order them by suit, and then by tValue
     for y in range(len(dealt_cards)):
@@ -352,6 +352,7 @@ def play_one_hand_of_rook(playerList: str):
     bid_winner = bid_sequence(list(players.values()))
     show_widow(widow, bid_winner)
     bid_winner.hand += widow
+
     end_widow, trump = pregame_details(bid_winner)
     assign_trump_to_cards(trump, list(players.values()))
 
@@ -486,7 +487,7 @@ def set_up_socket(hand, x):
 def show_hand_test():
     # make the cards and shuffle them
     cards = make_deck_list()
-    shuffled_deck = generate_shuffled_deck(cards)
+    shuffled_deck = shuffle_deck(cards)
 
     # deal cards: returns list of lists. Order -> 1,2,3,4, widow
     dealt_cards = deal(shuffled_deck)

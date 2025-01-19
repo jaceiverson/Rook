@@ -1,5 +1,9 @@
 import pickle
 import random
+import tkinter.dnd as dnd
+from tkinter import FLAT, SOLID, Button, E, Label, LabelFrame, Tk, W
+
+from PIL import Image, ImageTk
 
 
 class Player:
@@ -19,7 +23,7 @@ class Player:
         else:
             raise ValueError("Name must be a string")
         # player seat number
-        if num in range(4):
+        if num in range(1, 5):
             self.num = num
         else:
             raise ValueError("Player number must be between 1 and 4")
@@ -33,19 +37,22 @@ class Player:
         # save the entire socket object of the person
         self.socket_obj = socket_obj
 
+        # init hand
+        if hand is not None:
+            self.set_hand(hand)
+
     def set_hand(self, hand: list) -> None:
         # player hand list of card objects
         if isinstance(hand, list) and len(hand) == 13 and isinstance(hand[0], Card):
-            self.hand = hand
+            self.hand = Hand(hand)
         else:
             raise ValueError("Hand must be a list of 13 card objects")
 
     def show_hand(self):
         # print the list of hands to the console
-        self.hand.sort(key=lambda x: [x.suit, x.tvalue], reverse=True)
+        self.hand.sort()
         print(f"{self.name}'s Hand")
-        for x in range(len(self.hand)):
-            print(x + 1, self.hand[x].suit, self.hand[x].number)
+        self.hand.show()
 
     def available_cards(self, lead_suit: str, count: int, lead_suit_is_trump: bool):
         # determines which cards are available to play each trick
@@ -97,9 +104,6 @@ class Player:
     def set_bid(self, bid):
         self.bid = bid
 
-    def set_hand(self, hand):
-        self.hand = hand
-
     def close_socket(self):
         self.socket_obj.close()
 
@@ -131,7 +135,7 @@ class Team:
         return f"Team: {self.player1.name} and {self.player2.name}"
 
     def __str__(self):
-        return f"Team: {self.player1.name} and {self.player2.name}"
+        return self.__repr__()
 
 
 class Card:
@@ -142,67 +146,108 @@ class Card:
         pvalue: int,
         tvalue: int,
         trump: bool = False,
+        is_front: bool = True,
     ):
-        # suit of the card object
-        if suit.lower() in {"red", "green", "yellow", "black", "rook"}:
-            self.suit = suit.lower()
-        else:
-            raise ValueError("Suit must be red, green, yellow, or black")
-
-        # number on the card
-        if number in range(1, 15) or number == 20:
-            self.number = number
-        else:
-            raise ValueError("Number must be between 1 and 14 or 20")
-
-        # Point Value of the card
-        if pvalue in {0, 5, 10, 15, 20}:
-            self.pvalue = pvalue
-        else:
-            raise ValueError("Point value must be 0, 5, 10, 15, or 20")
-
-        # Trick Value of card
-        if tvalue in range(2, 16) or tvalue == 20:
-            self.tvalue = tvalue
-        else:
-            raise ValueError("Trick value must be between 2 and 15 or 20")
-
-        # BOOLEAN if the card is trump
-        if trump in {True, False}:
-            self.trump = trump
-        else:
-            raise ValueError("Trump must be a boolean object: True or False")
+        # VALIDATE ALL THE INPUTS
+        # EACH of these will raise a ValueError if the input is not valid
+        # if it is valid, it will assign the value to the object
+        self.suit = self.suit_validation(suit)
+        self.number = self.number_validation(number)
+        self.pvalue = self.pvalue_validation(pvalue)
+        self.tvalue = self.tvalue_validation(tvalue)
+        self.trump = self.trump_validation(trump)
 
         # each card pertains to a particular player
         self.owner = None
 
+        # this is to show the front or back of the card in the GUI
+        self.is_front = is_front
+
+    @property
     def short_name(self):
         # card short name is the first letter of the suit and the number
         # unless the card is a rook, then it is rk
         return self.suit[0].lower() + str(self.number) if self.pvalue != 20 else "rk"
 
+    @staticmethod
+    def suit_validation(suit: str) -> str:
+        """
+        validate suit input
+        """
+        if suit.lower() in {"red", "green", "yellow", "black", "rook"}:
+            return suit.lower()
+        else:
+            raise ValueError("Suit must be red, green, yellow, black, or rook")
+
+    @staticmethod
+    def number_validation(number: int) -> int:
+        """
+        validate number input
+        """
+        if number in range(1, 15) or number == 20:
+            return number
+        else:
+            raise ValueError("Number must be between 1 and 14 or 20")
+
+    @staticmethod
+    def pvalue_validation(pvalue: int) -> int:
+        """
+        validate point value input
+        """
+        if pvalue in {0, 5, 10, 15, 20}:
+            return pvalue
+        else:
+            raise ValueError("Point value must be 0, 5, 10, 15, or 20")
+
+    @staticmethod
+    def tvalue_validation(tvalue: int) -> int:
+        """
+        validate trick value input
+        """
+        if tvalue in range(2, 16) or tvalue == 20:
+            return tvalue
+        else:
+            raise ValueError("Trick value must be between 2 and 15 or 20")
+
+    @staticmethod
+    def trump_validation(trump: bool) -> bool:
+        """
+        validate trump input
+        """
+        if trump in {True, False}:
+            return trump
+        else:
+            raise ValueError("Trump must be a boolean object: True or False")
+
     def __gt__(self, other):
+        """
+        Compare cards together. Logic of which cards are greater than others
+
+        In this case greater in terms of trick value
+        """
         if self.trump and not other.trump:
             return True
         elif not self.trump and other.trump:
             return False
-        elif self.trump:
+        elif self.suit == other.suit:
             return self.tvalue > other.tvalue
         else:
-            return self.tvalue > other.tvalue
+            return True
 
     def __lt__(self, other):
+        """
+        Compare cards together. Logic of which cards are less than others
+
+        This is the direct inverse of the __gt__() method
+        """
         if self.trump and not other.trump:
             return False
         elif not self.trump and other.trump:
             return True
-        elif self.trump:
+        elif self.suit == other.suit:
             return self.tvalue < other.tvalue
         else:
-            return self.tvalue < other.tvalue
-
-    def __eq__(self, other):
-        return self.tvalue == other.tvalue
+            return False
 
     def __repr__(self):
         return self.short_name()
@@ -211,13 +256,132 @@ class Card:
         return self.short_name()
 
 
+class Hand:
+    def __init__(self, cards):
+        self.cards = cards
+        self.top_row = []
+        self.bottom_row = []
+        self.card_images = []
+
+    def __add__(self, other):
+        if isinstance(other, list):
+            self.cards.extend(other)
+        elif isinstance(other, Card):
+            self.cards.append(other)
+        elif isinstance(other, Hand):
+            self.cards.extend(other.cards)
+
+        return self
+
+    def __len__(self):
+        return len(self.cards)
+
+    def show(self):
+        root = Tk()
+        root.title("Hand")
+        root.resizable(False, False)
+
+        # Frame for the buttons.
+        btn_frame = LabelFrame(root)
+        btn_frame.grid(row=0, column=1)
+
+        # Frame for the two card images.
+        cards_frame = LabelFrame(root, pady=4)
+        cards_frame.grid(row=1, column=0, padx=10, pady=5)
+
+        # Frame for the card information.
+        info_frame = LabelFrame(root)
+        info_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=5, sticky=W)
+
+        self.card_buttons = []
+        for idx, card in enumerate(self.cards):
+            button = Button(cards_frame, command=lambda idx=idx: self.show_back(idx))
+            self.card_buttons.append(button)
+            front = Image.open(f"./rook/resources/card-img/{card.short_name}.jpg")
+            photo = ImageTk.PhotoImage(front.resize((75, 120), Image.BOX))
+            button.config(image=photo)
+            button.image = photo  # Store reference to the PhotoImage
+            button.grid(row=1, column=idx + 1, padx=2, pady=2)
+            self.card_images.append(photo)
+
+        show_info_button = Button(
+            btn_frame, text="Show Card Info", command=self.submit_cards
+        )
+        show_info_button.pack()
+
+        drop_card_button = Button(
+            btn_frame, text="Drop Cards", command=lambda: (self.submit_cards, self.show)
+        )
+        drop_card_button.pack()
+
+        self.card_info_label = Label(info_frame, text="")
+        self.card_info_label.pack(anchor=W)
+
+        root.mainloop()
+
+    def show_back(self, card_index):
+        card = self.cards[card_index]
+        if card.is_front:
+            back = Image.open("./rook/resources/card-img/back.jpg")
+            photo = ImageTk.PhotoImage(back.resize((75, 120), Image.BOX))
+        else:
+            front = Image.open(f"./rook/resources/card-img/{card.short_name}.jpg")
+            photo = ImageTk.PhotoImage(front.resize((75, 120), Image.BOX))
+
+        self.card_buttons[card_index].config(image=photo)
+        self.card_buttons[card_index].image = photo
+
+        card.is_front = not card.is_front
+
+    def show_card_info(self):
+        visible_cards = [card.short_name for card in self.cards]
+        back_facing_cards = [
+            card.short_name for card in self.cards if not card.is_front
+        ]
+        formatted_vis_cards = "\n".join(visible_cards)
+        formatted_back_cards = "\n".join(back_facing_cards)
+        card_info = f"Visible Cards:\n{formatted_vis_cards}\n\nBack-Facing Cards:\n{formatted_back_cards}"
+        self.card_info_label.config(text=card_info)
+
+    def submit_cards(self):
+        flipped_cards = [card for card in self.cards if not card.is_front]
+        """
+        for card in flipped_cards:
+            self.cards.remove(card)
+        """
+        flipped_card_names = [card.short_name for card in flipped_cards]
+        print("Flipped Cards:")
+        print(flipped_card_names)
+
+    def drop_flipped_cards(self, cards: list):
+        """
+        remove dropped cards from the hand
+
+        save them to a list to be returned. these are the new widow
+        """
+        new_widow = [card for card in self.cards if not card.is_front]
+        new_hand = [card for card in self.cards if card.is_front]
+        self.cards = new_hand
+        return new_widow
+
+    def refresh(self):
+        """clear the GUI and redraw the cards"""
+        pass
+
+    def sort(self):
+        """
+        Sort the cards in the hand by suit and then by tValue
+        """
+        self.cards.sort(key=lambda x: [x.suit, x.tvalue], reverse=True)
+
+
 class Trick:
     def __init__(
         self,
         number: int,
         first_card: Card = None,
         second_card: Card = None,
-        thrid_card: Card = None,
+        third_card: Card = None,
         forth_card: Card = None,
         winning_card: Card = None,
         winning_player: Player = None,
@@ -228,7 +392,7 @@ class Trick:
 
         self.second_card = second_card
 
-        self.third_card = thrid_card
+        self.third_card = third_card
 
         self.forth_card = forth_card
 
@@ -340,7 +504,7 @@ class Round:
         """
         self.trump = trump_suit
         for x in self.players:
-            for y in x.hand:
+            for y in x.hand.cards:
                 # also assign each card to its owner
                 y.owner = x
                 if y.suit in [self.trump_suit, "Rook"]:
@@ -355,6 +519,8 @@ class Round:
     def start(self):
         # deal cards: returns list of lists. Order -> 1,2,3,4, widow
         self.deal()
+
+        self.players[0].hand.show()
 
         # bidding sequence
         self.bidding_round()
